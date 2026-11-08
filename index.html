@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Notes</title>
+<style>
+:root{--bg:#000;--s:#121212;--ink:#ececec;--mut:#8c8c8c;--acc:#f2f2f2;--ai:#000;--line:#242424;--fs:18}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+#app{height:100%;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;min-height:64px}
+.bar h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.5px}
+.icon{width:44px;height:44px;border-radius:50%;border:0;background:var(--s);display:flex;align-items:center;justify-content:center}
+.icon svg{width:22px;height:22px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.textbtn{border:0;background:none;color:var(--mut);font-size:16px;padding:10px 8px}
+.textbtn.arm{color:#ff6b6b;font-weight:700}
+.list{flex:1;overflow-y:auto;padding:4px 16px 110px;display:flex;flex-direction:column;gap:10px}
+.note{text-align:left;background:var(--s);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.note b{font-size:calc(var(--fs)*1px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note span{color:var(--mut);font-size:calc(var(--fs)*.85px);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.note time{color:var(--mut);font-size:12px;opacity:.8}
+.empty{margin:18vh 0 0;text-align:center;color:var(--mut);line-height:1.6;font-size:17px}
+.fab{position:fixed;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 26px);width:62px;height:62px;border-radius:50%;border:0;background:var(--acc);color:var(--ai);font-size:36px;line-height:1;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.fab{display:flex;align-items:center;justify-content:center}
+.fab svg{width:30px;height:30px;stroke:var(--ai);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+#ta{flex:1;width:100%;background:transparent;border:0;outline:none;resize:none;color:var(--ink);padding:6px 20px 110px;font-family:Georgia,"Iowan Old Style","Times New Roman",serif;font-size:calc(var(--fs)*1px);line-height:1.55}
+#ta::placeholder{color:var(--mut)}
+.set{flex:1;overflow-y:auto;padding:4px 18px 30px}
+.set h2{font-size:15px;font-weight:700;color:var(--mut);margin:22px 0 10px}
+.row{display:flex;align-items:center;gap:14px}
+.row input{flex:1;accent-color:var(--acc);height:32px}
+.row output{min-width:44px;text-align:right;font-weight:700}
+.sample{margin:14px 0 0;padding:14px 16px;background:var(--s);border:1px solid var(--line);border-radius:14px;font-family:Georgia,serif;font-size:calc(var(--fs)*1px);line-height:1.5}
+.themes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.th{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:var(--s);border:2px solid var(--line);text-align:left;font-weight:600}
+.th[aria-pressed="true"]{border-color:var(--acc)}
+.dot{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.25);flex:none}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+(function(){
+var THEMES={
+ black:{n:'Black',bg:'#000000',s:'#121212',ink:'#ececec',mut:'#8c8c8c',acc:'#f2f2f2',ai:'#000000',line:'#242424'},
+ purple:{n:'Purple',bg:'#120b21',s:'#1d1433',ink:'#ece4ff',mut:'#9c8cc0',acc:'#a67cff',ai:'#120b21',line:'#2c2049'},
+ blue:{n:'Blue',bg:'#08111f',s:'#101e36',ink:'#e3efff',mut:'#8aa2c4',acc:'#4da3ff',ai:'#08111f',line:'#1a2d4d'},
+ green:{n:'Dark green',bg:'#06130c',s:'#0e2217',ink:'#dff3e6',mut:'#84a894',acc:'#3fcf8e',ai:'#06130c',line:'#173325'},
+ maroon:{n:'Maroon',bg:'#18090d',s:'#2a1119',ink:'#f6e3e7',mut:'#b78b94',acc:'#ff6b81',ai:'#18090d',line:'#401a26'}
+};
+var mem={};
+function ld(k,d){try{var v=localStorage.getItem(k);if(v)return JSON.parse(v)}catch(e){}return mem[k]!==undefined?mem[k]:d}
+function sv(k,v){mem[k]=v;try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+var notes=ld('notes',[]),set=ld('settings',{theme:'black',size:18});
+if(!THEMES[set.theme])set.theme='black';
+var app=document.getElementById('app'),pushed=0;
+
+var GEAR='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+var BACK='<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>';
+var CHECK='<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function esc(s){return s.replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function find(id){for(var i=0;i<notes.length;i++)if(notes[i].id===id)return notes[i]}
+function purge(except){var n=notes.length;notes=notes.filter(function(x){return x.text.trim()||x.id===except});if(notes.length!==n)sv('notes',notes)}
+
+function applyTheme(){
+  var t=THEMES[set.theme],r=document.documentElement.style;
+  r.setProperty('--bg',t.bg);r.setProperty('--s',t.s);r.setProperty('--ink',t.ink);r.setProperty('--mut',t.mut);
+  r.setProperty('--acc',t.acc);r.setProperty('--ai',t.ai);r.setProperty('--line',t.line);r.setProperty('--fs',set.size);
+  document.querySelector('meta[name=theme-color]').setAttribute('content',t.bg);
+}
+function go(h){pushed++;location.hash=h}
+function back(){if(pushed>0){pushed--;history.back()}else location.hash=''}
+
+function showList(){
+  var list=notes.slice().sort(function(a,b){return b.t-a.t});
+  var h='<header class="bar"><h1>Notes</h1><button class="icon" id="gear" aria-label="Settings">'+GEAR+'</button></header><div class="list">';
+  if(!list.length)h+='<p class="empty">No notes yet.<br>Tap + to write your first one.</p>';
+  list.forEach(function(n){
+    var lines=n.text.split('\n').filter(function(l){return l.trim()});
+    var prev=lines.slice(1).join(' ');
+    h+='<button class="note" data-id="'+n.id+'"><b>'+esc(lines[0]||'')+'</b>'+(prev?'<span>'+esc(prev)+'</span>':'')+'<time>'+new Date(n.t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</time></button>';
+  });
+  h+='</div><button class="fab" id="add" aria-label="Add note">+</button>';
+  app.innerHTML=h;
+  document.getElementById('gear').onclick=function(){go('settings')};
+  document.getElementById('add').onclick=function(){
+    var n={id:Date.now().toString(36),text:'',t:Date.now()};notes.push(n);go('note-'+n.id);
+  };
+  Array.prototype.forEach.call(app.querySelectorAll('.note'),function(b){b.onclick=function(){go('note-'+b.getAttribute('data-id'))}});
+}
+
+function showEditor(id){
+  var n=find(id);if(!n){location.hash='';return}
+  app.innerHTML='<header class="bar"><button class="icon" id="back" aria-label="Back">'+BACK+'</button><button class="textbtn" id="del">Delete</button></header><textarea id="ta" placeholder="Write your note…"></textarea><button class="fab" id="done" aria-label="Done">'+CHECK+'</button>';
+  var ta=document.getElementById('ta');ta.value=n.text;
+  ta.oninput=function(){n.text=ta.value;n.t=Date.now();sv('notes',notes)};
+  if(!n.text)ta.focus();
+  document.getElementById('back').onclick=back;
+  document.getElementById('done').onclick=function(){ta.blur();back()};
+  var del=document.getElementById('del'),timer;
+  del.onclick=function(){
+    if(del.classList.contains('arm')){notes=notes.filter(function(x){return x.id!==id});sv('notes',notes);back();return}
+    del.classList.add('arm');del.textContent='Tap again to delete';
+    clearTimeout(timer);timer=setTimeout(function(){del.classList.remove('arm');del.textContent='Delete'},3000);
+  };
+}
+
+function showSettings(){
+  var h='<header class="bar"><button class="icon" id="back" aria-label="Back">'+BACK+'</button><h1>Settings</h1><span style="width:44px"></span></header><div class="set">'
+   +'<h2>Font size</h2><div class="row"><input type="range" id="fs" min="12" max="30" step="1" value="'+set.size+'" aria-label="Font size"><output id="fo">'+set.size+'</output></div>'
+   +'<p class="sample">The quick brown fox jumps over the lazy dog.</p><h2>Theme</h2><div class="themes">';
+  Object.keys(THEMES).forEach(function(k){
+    var t=THEMES[k];
+    h+='<button class="th" data-k="'+k+'" aria-pressed="'+(k===set.theme)+'"><span class="dot" style="background:linear-gradient(135deg,'+t.bg+' 50%,'+t.acc+' 50%)"></span>'+t.n+'</button>';
+  });
+  app.innerHTML=h+'</div></div>';
+  document.getElementById('back').onclick=back;
+  var fs=document.getElementById('fs');
+  fs.oninput=function(){set.size=+fs.value;document.getElementById('fo').textContent=fs.value;sv('settings',set);applyTheme()};
+  Array.prototype.forEach.call(app.querySelectorAll('.th'),function(b){
+    b.onclick=function(){
+      set.theme=b.getAttribute('data-k');sv('settings',set);applyTheme();
+      Array.prototype.forEach.call(app.querySelectorAll('.th'),function(o){o.setAttribute('aria-pressed',o===b)});
+    };
+  });
+}
+
+function route(){
+  var h=location.hash.slice(1);
+  if(!h)pushed=0;
+  purge(h.indexOf('note-')===0?h.slice(5):null);
+  if(h==='settings')showSettings();
+  else if(h.indexOf('note-')===0)showEditor(h.slice(5));
+  else showList();
+}
+window.addEventListener('hashchange',route);
+applyTheme();route();
+})();
+</script>
+</body>
+</html>
